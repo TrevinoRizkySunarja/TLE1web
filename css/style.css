@@ -1,0 +1,118 @@
+/* Algemene stijl */
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  margin: 0;
+  background-color: #121212; /* zwart/donkergrijs */
+  color: #e0e0e0; /* lichtgrijs */
+}
+
+/* Header */
+header {
+  background: linear-gradient(90deg, #6a0dad, #8e44ad); /* paars verloop */
+  color: white;
+  text-align: center;
+  padding: 2rem 1rem;
+}
+header h1 {
+  margin: 0;
+  font-size: 2.2rem;
+}
+header .subtitle {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  color: #d8bfd8; /* licht paars */
+}
+
+/* Main layout */
+main {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2rem;
+  padding: 2rem;
+}
+
+/* Uploader */
+.uploader {
+  flex: 1 1 320px;
+  background: #1f1f1f;
+  border-radius: 10px;
+  padding: 1.5rem;
+  box-shadow: 0 0 10px rgba(106, 13, 173, 0.4);
+}
+.uploader h2 {
+  color: #bb86fc;
+}
+.uploader form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.uploader textarea,
+.uploader input[type="text"],
+.uploader input[type="file"] {
+  padding: 0.6rem;
+  border: 1px solid #6a0dad;
+  border-radius: 6px;
+  background: #2b2b2b;
+  color: #e0e0e0;
+}
+.uploader textarea:focus,
+.uploader input:focus {
+  outline: none;
+  border-color: #bb86fc;
+}
+.uploader button {
+  background: #6a0dad;
+  color: white;
+  border: none;
+  padding: 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+.uploader button:hover {
+  background: #bb86fc;
+}
+
+/* Feed */
+.feed {
+  flex: 1 1 400px;
+  background: #1f1f1f;
+  border-radius: 10px;
+  padding: 1.5rem;
+  box-shadow: 0 0 10px rgba(142, 68, 173, 0.4);
+}
+.feed h2 {
+  color: #bb86fc;
+}
+#feed {
+  margin-top: 1rem;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #6a0dad;
+  border-radius: 8px;
+  padding: 1rem;
+}
+#feed .placeholder {
+  color: #aaa;
+}
+.post {
+  text-align: center;
+  animation: fadeIn 0.8s ease-in-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Footer */
+footer {
+  text-align: center;
+  padding: 1rem;
+  background: #111;
+  color: #888;
+  font-size: 0.9rem;
+}

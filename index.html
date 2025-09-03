@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Feed Simulator</title>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+  <header>
+    <h1>AI Feed Simulator</h1>
+    <p class="subtitle">Originele content → algoritme-proof → live feed</p>
+  </header>
+
+  <main>
+    <section class="uploader">
+      <h2>Plaats je content</h2>
+      <form id="uploader">
+        <textarea name="text" rows="4" placeholder="Plak hier je tekst..."></textarea>
+        <input type="text" name="imageDescription" placeholder="Beschrijf je afbeelding (optioneel)" />
+        <input type="file" name="image" accept="image/*" />
+        <button type="submit">Start</button>
+      </form>
+    </section>
+
+    <section class="feed">
+      <h2>Feed</h2>
+      <div id="feed">
+        <div class="placeholder">Nog geen posts…</div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>© 2025 AI Feed Simulator – CMGT Project</p>
+  </footer>
+
+  <script>
+    // Placeholder JS – hier kan later de API-integratie komen
+    document.getElementById("uploader").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const feed = document.getElementById("feed");
+      feed.innerHTML = `
+        <div class="post">
+          <p><strong>Algoritme-proof versie:</strong></p>
+          <p>✨ Voorbeeld herschreven content verschijnt hier ✨</p>
+        </div>
+      `;
+    });
+  </script>
+</body>
+</html>
