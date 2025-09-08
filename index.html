@@ -116,25 +116,26 @@
   </template>
 
   <script>
-    // ====== AUTOCORRECT (simple, offline) ======
+    // ====== AUTOCORRECT (improved, offline) ======
     const DICT = {
-      // NL veelvoorkomende
-      "ikben":"ik ben","kvind":"ik vind","mss":"misschien","misshcien":"misschien","misschein":"misschien",
-      "zowiezo":"sowieso","soweiso":"sowieso","sowiezo":"sowieso",
-      "isg":"is g","ff":"even","mr":"maar","msschien":"misschien",
-      "me":"mij","mn":"mijn","mezelf":"mijzelf","kv":"ik vind","zkr":"zeker",
-      "wg":"weg","iig":"in ieder geval","iig.":"in ieder geval",
+      // NL veelvoorkomend
+      "ikben":"ik ben","kvind":"ik vind","kben":"ik ben","kheb":"ik heb","kkan":"ik kan",
+      "mss":"misschien","msschien":"misschien","misshcien":"misschien","misschein":"misschien","zowiezo":"sowieso","soweiso":"sowieso",
+      "ff":"even","mr":"maar","strx":"straks","iig":"in ieder geval","idd":"inderdaad",
+      "wss":"waarschijnlijk","wrm":"waarom","zegmaar":"zeg maar","gewoonff":"gewoon even",
       "ikkan":"ik kan","kanik":"kan ik","ikheb":"ik heb","hebtik":"heb ik",
-      // EN basic
-      "helo":"hello","wrld":"world","teh":"the","adress":"address","recieve":"receive","becouse":"because","wich":"which"
+      "me":"mij","mn":"mijn","mezelf":"mijzelf","zkr":"zeker","tog":"toch",
+      // EN basics
+      "helo":"hello","wrld":"world","teh":"the","adress":"address","recieve":"receive","becouse":"because","wich":"which","dont":"don't","cant":"can't"
     };
 
     function fixSpacing(str){
       return str
-        .replace(/\s+/g,' ')            // multiple spaces
-        .replace(/\s+([,.!?;:])/g,'$1') // space before punctuation
-        .replace(/([,.!?;:])(?=\S)/g,'$1 ') // ensure space after punctuation
-        .replace(/\s+'\s+/g, "'");      // quotes spacing
+        .replace(/\s+/g,' ')                 // multiple spaces -> one
+        .replace(/\s+([,.!?;:])/g,'$1')      // space before punctuation
+        .replace(/([,.!?;:])(?=\S)/g,'$1 ')  // ensure space after
+        .replace(/\s+'\s+/g, "'")            // quotes spacing
+        .replace(/\s*-\s*/g, ' - ');         // dash spacing
     }
 
     function sentenceCase(str){
@@ -142,12 +143,18 @@
       return str.replace(/(^\s*[a-zà-ÿ])|([.!?]\s+[a-zà-ÿ])/g, s => s.toUpperCase());
     }
 
+    function normalizePronouns(str){
+      // Capitalize standalone English "i" and Dutch "ik" at sentence start
+      return str
+        .replace(/(^|\s)i(\s)/g, '$1I$2')
+        .replace(/(^|\.\s+)(ik)\b/gi, (m,p1)=>p1 + 'Ik');
+    }
+
     function autocorrect(text){
       if (!text) return "";
-      // normalize apostrophes & spaces
       let t = text.replace(/[’]/g,"'").trim();
 
-      // word-level replacements (keep casing of first letter)
+      // token-wise replacements while preserving first-letter case
       t = t.split(/(\b)/).map(tok=>{
         const low = tok.toLowerCase();
         if (DICT[low]){
@@ -160,30 +167,30 @@
         return tok;
       }).join('');
 
+      // quick grammar-ish normalizations
+      t = normalizePronouns(t);
       t = fixSpacing(t);
 
-      // ensure sentence punctuation at end
+      // add period if missing
       if (!/[.!?…]$/.test(t)) t += '.';
 
-      // capitalise sentences, clean spaces again
+      // sentence capitalization + final spacing
       t = sentenceCase(t);
       t = fixSpacing(t).trim();
       return t;
     }
 
     function makeHook(text){
-      // take first sentence up to 80 chars
       const first = (text.split(/[.!?]/)[0] || text).trim();
       return first.slice(0, 80);
     }
 
     function makeHashtags(text){
-      // naive keywords: pick longest unique words (length>=6), 3–6 tags
       const words = [...new Set(
         text.toLowerCase()
           .replace(/[^a-zà-ÿ0-9\s-]/gi,'')
           .split(/\s+/)
-          .filter(w=>w.length>=6 && !['misschien','iedere','omdat','vandaag','morgen'].includes(w))
+          .filter(w=>w.length>=6 && !['misschien','iedere','omdat','vandaag','morgen','inderdaad'].includes(w))
       )];
       words.sort((a,b)=>b.length-a.length);
       return words.slice(0,5).map(w=>`#${w.replace(/-+/g,'')}`);
@@ -263,9 +270,9 @@
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
-      const rawText  = fd.get('text')?.toString() ?? '';
-      const user     = fd.get('username')?.toString() || 'user_demo';
-      const imgdesc  = fd.get('imgdesc')?.toString() || '';
+      const rawText  = (fd.get('text') ?? '').toString();
+      const user     = (fd.get('username') ?? 'user_demo').toString() || 'user_demo';
+      const imgdesc  = (fd.get('imgdesc') ?? '').toString();
       const file     = fd.get('image');
 
       // image → DataURL (demo only)
@@ -283,11 +290,15 @@
       const hook = makeHook(corrected);
       const hashtags = makeHashtags(corrected);
 
+      // Debug preview in console, so you can verify difference
+      console.log('%cOriginal:', 'color:#aaa', rawText);
+      console.log('%cCorrected:', 'color:#7dfc9f', corrected);
+
       posts.push({
         user,
         original: rawText,
         hook,
-        caption: corrected,
+        caption: corrected,    // <-- feed uses corrected by default
         hashtags,
         alt: imgdesc ? imgdesc.slice(0,120) : 'Autocorrected post',
         img: dataUrl
