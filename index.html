@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>AI Feed Simulator (Autocorrect)</title>
   <link rel="stylesheet" href="css/style.css"/>
+  <style>
+    /* Tiny inline notice in case of JS errors */
+    .notice{display:none;margin:10px 0;padding:10px;border-radius:8px;background:#3a1b1b;color:#ffdede;border:1px solid #803;}
+    .notice.show{display:block}
+  </style>
 </head>
 <body>
   <header class="appbar">
@@ -20,12 +25,13 @@
   <main class="page">
     <section class="composer card">
       <h2>Plaats je content</h2>
+      <div id="jsNotice" class="notice"></div>
       <form id="composerForm">
         <div class="row">
           <img class="avatar" src="https://ui-avatars.com/api/?name=U&background=6a0dad&color=fff" alt="Jouw avatar"/>
           <input type="text" name="username" placeholder="Gebruikersnaam (optioneel)" />
         </div>
-        <textarea name="text" rows="3" placeholder="Schrijf iets… met spelfouten of rare zinnen, ik fix het 😉" spellcheck="true"></textarea>
+        <textarea name="text" rows="3" placeholder="Schrijf iets… met spelfouten of rare zinnen, ik fix het 😉" spellcheck="true" required></textarea>
 
         <div class="upload-row">
           <input type="file" name="image" id="image" accept="image/*"/>
@@ -116,158 +122,152 @@
   </template>
 
   <script>
-    // ================= AUTOCORRECT (final tuned) =================
-    const DICT = {
-      // NL abbreviations & common typos
-      "ikben":"ik ben","kben":"ik ben","ikheb":"ik heb","kheb":"ik heb","ikkan":"ik kan","kkan":"ik kan",
-      "kvind":"ik vind","ikvindt":"ik vind","vindik":"vind ik","zegmaar":"zeg maar",
-      "mss":"misschien","msschien":"misschien","mischien":"misschien","mischein":"misschien","misschein":"misschien",
-      "zowiezo":"sowieso","soweiso":"sowieso","sowiezo":"sowieso",
-      "ff":"even","mr":"maar","idd":"inderdaad","iig":"in ieder geval","wss":"waarschijnlijk","wrm":"waarom",
-      "mn":"mijn","me":"mij","mezelf":"mijzelf","zkr":"zeker","tog":"toch",
-      // EN basics
-      "helo":"hello","wrld":"world","teh":"the","adress":"address","recieve":"receive","becouse":"because","wich":"which",
-      "dont":"don't","cant":"can't"
-    };
-  
-    function fixSpacing(str){
-      return str
-        .replace(/\s+/g,' ')
-        .replace(/\s+([,.!?;:])/g,'$1')
-        .replace(/([,.!?;:])(?=\S)/g,'$1 ')
-        .replace(/\s+'\s+/g, "'")
-        .replace(/\s*-\s*/g, ' - ');
-    }
-  
-    function sentenceCase(str){
-      return str.replace(/(^\s*[a-zà-ÿ])|([.!?]\s+[a-zà-ÿ])/g, s => s.toUpperCase());
-    }
-  
-    function autocorrect(text){
-      if (!text) return "";
-      let t = String(text).replace(/[’]/g,"'").trim();
-  
-      // 1) token replacements (preserve first-letter case)
-      t = t.split(/(\b)/).map(tok=>{
-        const low = tok.toLowerCase();
-        if (DICT[low]){
-          const rep = DICT[low];
-          return /^[A-ZÀ-Ý]/.test(tok) ? rep.charAt(0).toUpperCase() + rep.slice(1) : rep;
-        }
-        return tok;
-      }).join('');
-  
-      // 2) grammar-ish fixes
-      //   "het/dit/dat/wat/alles/niets/iets/er word" -> "… wordt"
-      t = t.replace(/\b(het|dit|dat|wat|alles|niets|iets|er)\s+word\b/gi, (_,p1)=> `${p1} wordt`);
-      //   normalize "misschien" variants again (just in case)
-      t = t.replace(/\bmis+ch?ie?n\b/gi, 'misschien');
-      //   uppercase standalone English "i"
-      t = t.replace(/\bi\b/g, 'I');
-  
-      // 3) punctuation & casing
-      t = fixSpacing(t);
-      if (!/[.!?…]$/.test(t)) t += '.';
-      t = sentenceCase(t);
-      t = fixSpacing(t).trim();
-      return t;
-    }
-  
-    function makeHook(text){
-      const first = (text.split(/[.!?]/)[0] || text).trim();
-      return first.slice(0, 80);
-    }
-  
-    function makeHashtags(text){
-      const words = [...new Set(
-        text.toLowerCase()
-          .replace(/[^a-zà-ÿ0-9\s-]/gi,'')
-          .split(/\s+/)
-          .filter(w=>w.length>=6 && !['misschien','inderdaad','iedere','omdat','vandaag','morgen'].includes(w))
-      )];
-      words.sort((a,b)=>b.length-a.length);
-      return words.slice(0,5).map(w=>`#${w.replace(/-+/g,'')}`);
-    }
-  
-    // ================= FEED / UI (unchanged) =================
-    const form = document.getElementById('composerForm');
-    const tpl = document.getElementById('postTpl');
-    const feed = document.getElementById('feed');
-    const progress = document.getElementById('progress');
-    const posts = [];
-    let index = 0, timer = null;
-    const FEED_INTERVAL = 5000;
-  
-    function animateProgress() {
-      progress.style.transition = 'none';
-      progress.style.width = '0%';
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          progress.style.transition = `width ${FEED_INTERVAL}ms linear`;
-          progress.style.width = '100%';
-        });
-      });
-    }
-  
-    function renderPost(p) {
-      feed.innerHTML = '';
-      const node = tpl.content.cloneNode(true);
-  
-      node.querySelector('.avatar').src =
-        `https://ui-avatars.com/api/?name=${encodeURIComponent(p.user||'U')}&background=6a0dad&color=fff`;
-      node.querySelector('.username').textContent = p.user || 'user_demo';
-  
-      const imgEl = node.querySelector('.image');
-      if (p.img) {
-        imgEl.src = p.img;
-        imgEl.alt = p.alt;
-      } else {
-        imgEl.src = 'https://placehold.co/800x800/1f1f1f/aaaaaa?text=Geen+afbeelding';
-        imgEl.alt = 'Placeholder';
+  // ---------- error surface ----------
+  const showMsg = (m)=>{ const el=document.getElementById('jsNotice'); el.textContent=m; el.classList.add('show'); };
+
+  // ================= AUTOCORRECT (final tuned) =================
+  const DICT = {
+    "ikben":"ik ben","kben":"ik ben","ikheb":"ik heb","kheb":"ik heb","ikkan":"ik kan","kkan":"ik kan",
+    "kvind":"ik vind","ikvindt":"ik vind","vindik":"vind ik","zegmaar":"zeg maar",
+    "mss":"misschien","msschien":"misschien","mischien":"misschien","mischein":"misschien","misschein":"misschien",
+    "zowiezo":"sowieso","soweiso":"sowieso","sowiezo":"sowieso",
+    "ff":"even","mr":"maar","idd":"inderdaad","iig":"in ieder geval","wss":"waarschijnlijk","wrm":"waarom",
+    "mn":"mijn","me":"mij","mezelf":"mijzelf","zkr":"zeker","tog":"toch",
+    "helo":"hello","wrld":"world","teh":"the","adress":"address","recieve":"receive","becouse":"because","wich":"which",
+    "dont":"don't","cant":"can't"
+  };
+
+  function fixSpacing(str){
+    return str
+      .replace(/\s+/g,' ')
+      .replace(/\s+([,.!?;:])/g,'$1')
+      .replace(/([,.!?;:])(?=\S)/g,'$1 ')
+      .replace(/\s+'\s+/g, "'")
+      .replace(/\s*-\s*/g, ' - ');
+  }
+  function sentenceCase(str){
+    return str.replace(/(^\s*[a-zà-ÿ])|([.!?]\s+[a-zà-ÿ])/g, s => s.toUpperCase());
+  }
+  function autocorrect(text){
+    if (text == null) return "";
+    let t = String(text).replace(/[’]/g,"'").trim();
+
+    // 1) token replacements
+    t = t.split(/(\b)/).map(tok=>{
+      const low = tok.toLowerCase();
+      if (DICT[low]){
+        const rep = DICT[low];
+        return /^[A-ZÀ-Ý]/.test(tok) ? rep.charAt(0).toUpperCase() + rep.slice(1) : rep;
       }
-  
-      const textEl = node.querySelector('.text');
-      const tagEl  = node.querySelector('.hashtags');
-      textEl.textContent = `【Hook】 ${p.hook}\n\n${p.caption}`;
-      tagEl.textContent  = (p.hashtags || []).join(' ');
-  
-      node.querySelector('.toggle-original').addEventListener('change', (e) => {
-        if (e.target.checked) {
-          textEl.textContent = p.original || '—';
-          tagEl.textContent  = '';
-          feed.querySelector('.badge').textContent = 'Original';
-          feed.querySelector('.pill.ai').textContent = 'Original View';
-        } else {
-          textEl.textContent = `【Hook】 ${p.hook}\n\n${p.caption}`;
-          tagEl.textContent  = (p.hashtags || []).join(' ');
-          feed.querySelector('.badge').textContent = 'Corrected';
-          feed.querySelector('.pill.ai').textContent = 'AutoCorrect';
-        }
+      return tok;
+    }).join('');
+
+    // 2) grammar-ish fixes
+    t = t.replace(/\b(het|dit|dat|wat|alles|niets|iets|er)\s+word\b/gi, (_,p1)=> `${p1} wordt`);
+    t = t.replace(/\bmis+ch?ie?n\b/gi, 'misschien');
+    t = t.replace(/\bi\b/g, 'I');
+
+    // 3) punctuation & casing
+    t = fixSpacing(t);
+    if (!/[.!?…]$/.test(t)) t += '.';
+    t = sentenceCase(t);
+    t = fixSpacing(t).trim();
+    return t;
+  }
+  function makeHook(text){
+    const first = (text.split(/[.!?]/)[0] || text).trim();
+    return first.slice(0, 80);
+  }
+  function makeHashtags(text){
+    const words = [...new Set(
+      text.toLowerCase()
+        .replace(/[^a-zà-ÿ0-9\s-]/gi,'')
+        .split(/\s+/)
+        .filter(w=>w.length>=6 && !['misschien','inderdaad','iedere','omdat','vandaag','morgen'].includes(w))
+    )];
+    words.sort((a,b)=>b.length-a.length);
+    return words.slice(0,5).map(w=>`#${w.replace(/-+/g,'')}`);
+  }
+
+  // ================= FEED / UI =================
+  const form = document.getElementById('composerForm');
+  const tpl = document.getElementById('postTpl');
+  const feed = document.getElementById('feed');
+  const progress = document.getElementById('progress');
+  const posts = [];
+  let index = 0, timer = null;
+  const FEED_INTERVAL = 5000;
+
+  function animateProgress() {
+    if (!progress) return;
+    progress.style.transition = 'none';
+    progress.style.width = '0%';
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        progress.style.transition = `width ${FEED_INTERVAL}ms linear`;
+        progress.style.width = '100%';
       });
-  
-      feed.appendChild(node);
-      animateProgress();
-    }
-  
-    function nextPost() {
-      if (!posts.length) return;
-      renderPost(posts[index % posts.length]);
-      index++;
-    }
-    function startLoop() {
-      if (timer) clearInterval(timer);
-      nextPost();
-      timer = setInterval(nextPost, FEED_INTERVAL);
-    }
-  
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
+    });
+  }
+  function renderPost(p) {
+    if (!tpl) return showMsg('Template niet gevonden.');
+    feed.innerHTML = '';
+    const node = tpl.content.cloneNode(true);
+
+    node.querySelector('.avatar').src =
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(p.user||'U')}&background=6a0dad&color=fff`;
+    node.querySelector('.username').textContent = p.user || 'user_demo';
+
+    const imgEl = node.querySelector('.image');
+    if (p.img) { imgEl.src = p.img; imgEl.alt = p.alt; }
+    else { imgEl.src = 'https://placehold.co/800x800/1f1f1f/aaaaaa?text=Geen+afbeelding'; imgEl.alt = 'Placeholder'; }
+
+    const textEl = node.querySelector('.text');
+    const tagEl  = node.querySelector('.hashtags');
+    textEl.textContent = `【Hook】 ${p.hook}\n\n${p.caption}`;
+    tagEl.textContent  = (p.hashtags || []).join(' ');
+
+    node.querySelector('.toggle-original').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        textEl.textContent = p.original || '—';
+        tagEl.textContent  = '';
+        feed.querySelector('.badge').textContent = 'Original';
+        feed.querySelector('.pill.ai').textContent = 'Original View';
+      } else {
+        textEl.textContent = `【Hook】 ${p.hook}\n\n${p.caption}`;
+        tagEl.textContent  = (p.hashtags || []).join(' ');
+        feed.querySelector('.badge').textContent = 'Corrected';
+        feed.querySelector('.pill.ai').textContent = 'AutoCorrect';
+      }
+    });
+
+    feed.appendChild(node);
+    animateProgress();
+  }
+  function nextPost() {
+    if (!posts.length) return;
+    renderPost(posts[index % posts.length]);
+    index++;
+  }
+  function startLoop() {
+    if (timer) clearInterval(timer);
+    nextPost();
+    timer = setInterval(nextPost, FEED_INTERVAL);
+  }
+
+  // Guard: form exists?
+  if (!form) showMsg('Formulier niet gevonden. Klopt je HTML?');
+
+  // Submit handler
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
       const fd = new FormData(form);
       const rawText  = (fd.get('text') ?? '').toString();
       const user     = (fd.get('username') ?? 'user_demo').toString() || 'user_demo';
       const imgdesc  = (fd.get('imgdesc') ?? '').toString();
       const file     = fd.get('image');
-  
+
       let dataUrl = null;
       if (file && file.size) {
         dataUrl = await new Promise((resolve) => {
@@ -276,14 +276,14 @@
           r.readAsDataURL(file);
         });
       }
-  
+
       const corrected = autocorrect(rawText);
       const hook = makeHook(corrected);
       const hashtags = makeHashtags(corrected);
-  
+
       console.log('%cOriginal:', 'color:#aaa', rawText);
       console.log('%cCorrected:', 'color:#7dfc9f', corrected);
-  
+
       posts.push({
         user,
         original: rawText,
@@ -293,13 +293,15 @@
         alt: imgdesc ? imgdesc.slice(0,120) : 'Autocorrected post',
         img: dataUrl
       });
-  
+
       form.reset();
       document.querySelector('.empty')?.remove();
       if (posts.length === 1) startLoop();
-    });
+    } catch(err){
+      console.error(err);
+      showMsg('Er ging iets mis bij het posten. Check de console voor details.');
+    }
+  });
   </script>
-  
-  
 </body>
 </html>
