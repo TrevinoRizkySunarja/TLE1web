@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>AI Feed Simulator</title>
+  <title>AI Feed Simulator (Autocorrect)</title>
   <link rel="stylesheet" href="css/style.css"/>
 </head>
 <body>
@@ -12,8 +12,8 @@
       <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 1 7 7v6.5l1.6 2.77a1 1 0 0 1-1.74 1L18 17.5V9a6 6 0 1 0-12 0v8.5l-0.86 1.5a1 1 0 0 1-1.74-1L5 15.5V9a7 7 0 0 1 7-7Z"/></svg>
       <span>AI Feed Simulator</span>
     </div>
-    <div class="mode-chip">
-      <span class="dot"></span> In Control
+    <div class="mode-chip" title="In deze demo gebruiken we autocorrect (geen AI)">
+      <span class="dot"></span> Autocorrect
     </div>
   </header>
 
@@ -25,7 +25,7 @@
           <img class="avatar" src="https://ui-avatars.com/api/?name=U&background=6a0dad&color=fff" alt="Jouw avatar"/>
           <input type="text" name="username" placeholder="Gebruikersnaam (optioneel)" />
         </div>
-        <textarea name="text" rows="3" placeholder="Schrijf iets origineels… met spelfouten of rare zinnen, ik fix het 😉"></textarea>
+        <textarea name="text" rows="3" placeholder="Schrijf iets… met spelfouten of rare zinnen, ik fix het 😉" spellcheck="true"></textarea>
 
         <div class="upload-row">
           <input type="file" name="image" id="image" accept="image/*"/>
@@ -33,7 +33,7 @@
           <input type="text" name="imgdesc" placeholder="Korte beschrijving (voor alt-tekst, optioneel)"/>
         </div>
 
-        <button class="btn primary" type="submit">Posten & AI-perfect maken</button>
+        <button class="btn primary" type="submit">Posten & Autocorrigeren</button>
         <p class="hint">Elke post is <strong>5s zichtbaar</strong> en dan volgt de volgende.</p>
       </form>
     </section>
@@ -63,7 +63,7 @@
   </main>
 
   <footer class="foot">
-    © 2025 AI Feed Simulator — demo
+    © 2025 AI Feed Simulator — demo (autocorrect)
   </footer>
 
   <template id="postTpl">
@@ -77,7 +77,7 @@
           </div>
         </div>
         <div class="right">
-          <span class="pill ai">AI Optimized</span>
+          <span class="pill ai">AutoCorrect</span>
           <button class="icon-btn" title="Meer">
             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 10a2 2 0 1 0 0 4a2 2 0 0 0 0-4Zm6 0a2 2 0 1 0 0 4a2 2 0 0 0 0-4Zm6 0a2 2 0 1 0 0 4a2 2 0 0 0 0-4Z"/></svg>
           </button>
@@ -86,7 +86,7 @@
 
       <div class="image-wrap">
         <img class="image" src="" alt=""/>
-        <div class="badge">Perfected</div>
+        <div class="badge">Corrected</div>
       </div>
 
       <div class="caption">
@@ -116,23 +116,80 @@
   </template>
 
   <script>
-    // --- CONFIG: your API base ---
-    const API_BASE = 'http://127.0.0.1:5174';
+    // ====== AUTOCORRECT (simple, offline) ======
+    const DICT = {
+      // NL veelvoorkomende
+      "ikben":"ik ben","kvind":"ik vind","mss":"misschien","misshcien":"misschien","misschein":"misschien",
+      "zowiezo":"sowieso","soweiso":"sowieso","sowiezo":"sowieso",
+      "isg":"is g","ff":"even","mr":"maar","msschien":"misschien",
+      "me":"mij","mn":"mijn","mezelf":"mijzelf","kv":"ik vind","zkr":"zeker",
+      "wg":"weg","iig":"in ieder geval","iig.":"in ieder geval",
+      "ikkan":"ik kan","kanik":"kan ik","ikheb":"ik heb","hebtik":"heb ik",
+      // EN basic
+      "helo":"hello","wrld":"world","teh":"the","adress":"address","recieve":"receive","becouse":"because","wich":"which"
+    };
 
-  async function fetchPerfected(text, imgDesc="") {
-  const r = await fetch('/api/rewrite.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, imgDesc })
-  });
-  if (!r.ok) {
-    const t = await r.text().catch(()=>r.statusText);
-    throw new Error(`HTTP ${r.status} ${t}`);
-  }
-  return r.json(); // {hook, caption, alt, hashtags[]}
-}
+    function fixSpacing(str){
+      return str
+        .replace(/\s+/g,' ')            // multiple spaces
+        .replace(/\s+([,.!?;:])/g,'$1') // space before punctuation
+        .replace(/([,.!?;:])(?=\S)/g,'$1 ') // ensure space after punctuation
+        .replace(/\s+'\s+/g, "'");      // quotes spacing
+    }
 
+    function sentenceCase(str){
+      // Capitalize first letter of each sentence.
+      return str.replace(/(^\s*[a-zà-ÿ])|([.!?]\s+[a-zà-ÿ])/g, s => s.toUpperCase());
+    }
 
+    function autocorrect(text){
+      if (!text) return "";
+      // normalize apostrophes & spaces
+      let t = text.replace(/[’]/g,"'").trim();
+
+      // word-level replacements (keep casing of first letter)
+      t = t.split(/(\b)/).map(tok=>{
+        const low = tok.toLowerCase();
+        if (DICT[low]){
+          const rep = DICT[low];
+          if (/^[A-ZÀ-Ý]/.test(tok)) {
+            return rep.charAt(0).toUpperCase() + rep.slice(1);
+          }
+          return rep;
+        }
+        return tok;
+      }).join('');
+
+      t = fixSpacing(t);
+
+      // ensure sentence punctuation at end
+      if (!/[.!?…]$/.test(t)) t += '.';
+
+      // capitalise sentences, clean spaces again
+      t = sentenceCase(t);
+      t = fixSpacing(t).trim();
+      return t;
+    }
+
+    function makeHook(text){
+      // take first sentence up to 80 chars
+      const first = (text.split(/[.!?]/)[0] || text).trim();
+      return first.slice(0, 80);
+    }
+
+    function makeHashtags(text){
+      // naive keywords: pick longest unique words (length>=6), 3–6 tags
+      const words = [...new Set(
+        text.toLowerCase()
+          .replace(/[^a-zà-ÿ0-9\s-]/gi,'')
+          .split(/\s+/)
+          .filter(w=>w.length>=6 && !['misschien','iedere','omdat','vandaag','morgen'].includes(w))
+      )];
+      words.sort((a,b)=>b.length-a.length);
+      return words.slice(0,5).map(w=>`#${w.replace(/-+/g,'')}`);
+    }
+
+    // ====== FEED / UI ======
     const form = document.getElementById('composerForm');
     const tpl = document.getElementById('postTpl');
     const feed = document.getElementById('feed');
@@ -183,8 +240,8 @@
         } else {
           textEl.textContent = `【Hook】 ${p.hook}\n\n${p.caption}`;
           tagEl.textContent  = (p.hashtags || []).join(' ');
-          feed.querySelector('.badge').textContent = 'Perfected';
-          feed.querySelector('.pill.ai').textContent = 'AI Optimized';
+          feed.querySelector('.badge').textContent = 'Corrected';
+          feed.querySelector('.pill.ai').textContent = 'AutoCorrect';
         }
       });
 
@@ -221,22 +278,18 @@
         });
       }
 
-      let aiOut;
-      try {
-        aiOut = await fetchPerfected(rawText, imgdesc);
-      } catch (err) {
-        console.error('AI rewrite error:', err);
-        alert('AI rewrite failed. Using original text.');
-        aiOut = { hook: rawText.slice(0,80), caption: rawText, alt: imgdesc, hashtags: [] };
-      }
+      // 🔧 Local autocorrect instead of AI
+      const corrected = autocorrect(rawText);
+      const hook = makeHook(corrected);
+      const hashtags = makeHashtags(corrected);
 
       posts.push({
         user,
         original: rawText,
-        hook: aiOut.hook,
-        caption: aiOut.caption,
-        hashtags: aiOut.hashtags,
-        alt: aiOut.alt,
+        hook,
+        caption: corrected,
+        hashtags,
+        alt: imgdesc ? imgdesc.slice(0,120) : 'Autocorrected post',
         img: dataUrl
       });
 
