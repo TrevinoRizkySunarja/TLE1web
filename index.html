@@ -3,90 +3,45 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>AI Feed Simulator (Autocorrect)</title>
+  <title>AI Feed – Feed</title>
   <link rel="stylesheet" href="css/style.css"/>
-  <style>
-    /* Tiny inline notice in case of JS errors */
-    .notice{display:none;margin:10px 0;padding:10px;border-radius:8px;background:#3a1b1b;color:#ffdede;border:1px solid #803;}
-    .notice.show{display:block}
-  </style>
 </head>
 <body>
   <header class="appbar">
     <div class="brand">
       <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 1 7 7v6.5l1.6 2.77a1 1 0 0 1-1.74 1L18 17.5V9a6 6 0 1 0-12 0v8.5l-0.86 1.5a1 1 0 0 1-1.74-1L5 15.5V9a7 7 0 0 1 7-7Z"/></svg>
-      <span>AI Feed Simulator</span>
+      <span>AI Feed</span>
     </div>
-    <div class="mode-chip" title="In deze demo gebruiken we autocorrect (geen AI)">
-      <span class="dot"></span> Autocorrect
-    </div>
+    <nav class="topnav">
+      <a class="btn ghost" href="compose.html">+ Nieuwe post</a>
+    </nav>
   </header>
 
-  <main class="page">
-    <section class="composer card">
-      <h2>Plaats je content</h2>
-      <div id="jsNotice" class="notice"></div>
-      <form id="composerForm">
-        <div class="row">
-          <img class="avatar" src="https://ui-avatars.com/api/?name=U&background=6a0dad&color=fff" alt="Jouw avatar"/>
-          <input type="text" name="username" placeholder="Gebruikersnaam (optioneel)" />
-        </div>
-        <textarea name="text" rows="3" placeholder="Schrijf iets… met spelfouten of rare zinnen, ik fix het 😉" spellcheck="true" required></textarea>
-
-        <div class="upload-row">
-          <input type="file" name="image" id="image" accept="image/*"/>
-          <label for="image" class="btn ghost">Afbeelding kiezen</label>
-          <input type="text" name="imgdesc" placeholder="Korte beschrijving (voor alt-tekst, optioneel)"/>
-        </div>
-
-        <button class="btn primary" type="submit">Posten & Autocorrigeren</button>
-        <p class="hint">Elke post is <strong>5s zichtbaar</strong> en dan volgt de volgende.</p>
-      </form>
-    </section>
-
-    <section class="phone-wrap">
-      <div class="phone">
-        <div class="storybar"><div class="progress" id="progress"></div></div>
-        <div id="feed" class="feed">
-          <div class="empty">Nog geen posts… Plaats er één hierboven.</div>
-        </div>
-        <nav class="bottomnav">
-          <button aria-label="Home" class="active">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3l9-8Z"/></svg>
-          </button>
-          <button aria-label="Search">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 14 15.5l.27.28v.79L20 21.5 21.5 20l-6-6Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14Z"/></svg>
-          </button>
-          <button aria-label="Create">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 11H13V5h-2v6H5v2h6v6h2v-6h6z"/></svg>
-          </button>
-          <button aria-label="Profile">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 12a5 5 0 1 0-5-5a5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z"/></svg>
-          </button>
-        </nav>
-      </div>
+  <main class="page single-col">
+    <section class="feed-list" id="feedList">
+      <div class="empty big">Nog geen posts. <a href="compose.html">Maak je eerste post</a> ✨</div>
     </section>
   </main>
 
   <footer class="foot">
-    © 2025 AI Feed Simulator — demo (autocorrect)
+    © 2025 AI Feed — feed
   </footer>
 
-  <template id="postTpl">
+  <template id="postCardTpl">
     <article class="post card">
       <header class="post-head">
         <div class="left">
           <img class="avatar" src="" alt="Avatar"/>
           <div class="meta">
             <div class="username"></div>
-            <div class="time">nu</div>
+            <div class="time"></div>
           </div>
         </div>
         <div class="right">
           <span class="pill ai">AutoCorrect</span>
-          <button class="icon-btn" title="Meer">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 10a2 2 0 1 0 0 4a2 2 0 0 0 0-4Zm6 0a2 2 0 1 0 0 4a2 2 0 0 0 0-4Zm6 0a2 2 0 1 0 0 4a2 2 0 0 0 0-4Z"/></svg>
-          </button>
+          <a class="icon-btn" href="compose.html" title="Post maken">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 11H13V5h-2v6H5v2h6v6h2v-6h6z"/></svg>
+          </a>
         </div>
       </header>
 
@@ -122,186 +77,69 @@
   </template>
 
   <script>
-  // ---------- error surface ----------
-  const showMsg = (m)=>{ const el=document.getElementById('jsNotice'); el.textContent=m; el.classList.add('show'); };
+    // ---------- Storage helpers ----------
+    const LS_KEY = 'aiFeedPostsV1';
+    const loadPosts = () => {
+      try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
+      catch { return []; }
+    };
+    const savePosts = (arr) => localStorage.setItem(LS_KEY, JSON.stringify(arr));
 
-  // ================= AUTOCORRECT (final tuned) =================
-  const DICT = {
-    "ikben":"ik ben","kben":"ik ben","ikheb":"ik heb","kheb":"ik heb","ikkan":"ik kan","kkan":"ik kan",
-    "kvind":"ik vind","ikvindt":"ik vind","vindik":"vind ik","zegmaar":"zeg maar",
-    "mss":"misschien","msschien":"misschien","mischien":"misschien","mischein":"misschien","misschein":"misschien",
-    "zowiezo":"sowieso","soweiso":"sowieso","sowiezo":"sowieso",
-    "ff":"even","mr":"maar","idd":"inderdaad","iig":"in ieder geval","wss":"waarschijnlijk","wrm":"waarom",
-    "mn":"mijn","me":"mij","mezelf":"mijzelf","zkr":"zeker","tog":"toch",
-    "helo":"hello","wrld":"world","teh":"the","adress":"address","recieve":"receive","becouse":"because","wich":"which",
-    "dont":"don't","cant":"can't"
-  };
+    // ---------- Render feed ----------
+    const list = document.getElementById('feedList');
+    const tpl  = document.getElementById('postCardTpl');
 
-  function fixSpacing(str){
-    return str
-      .replace(/\s+/g,' ')
-      .replace(/\s+([,.!?;:])/g,'$1')
-      .replace(/([,.!?;:])(?=\S)/g,'$1 ')
-      .replace(/\s+'\s+/g, "'")
-      .replace(/\s*-\s*/g, ' - ');
-  }
-  function sentenceCase(str){
-    return str.replace(/(^\s*[a-zà-ÿ])|([.!?]\s+[a-zà-ÿ])/g, s => s.toUpperCase());
-  }
-  function autocorrect(text){
-    if (text == null) return "";
-    let t = String(text).replace(/[’]/g,"'").trim();
+    function timeLabel(ts){
+      try {
+        const d = new Date(ts);
+        return d.toLocaleString();
+      } catch { return 'nu'; }
+    }
 
-    // 1) token replacements
-    t = t.split(/(\b)/).map(tok=>{
-      const low = tok.toLowerCase();
-      if (DICT[low]){
-        const rep = DICT[low];
-        return /^[A-ZÀ-Ý]/.test(tok) ? rep.charAt(0).toUpperCase() + rep.slice(1) : rep;
+    function render(){
+      const posts = loadPosts().sort((a,b)=>b.createdAt - a.createdAt);
+      list.innerHTML = '';
+      if (!posts.length){
+        const emp = document.createElement('div');
+        emp.className = 'empty big';
+        emp.innerHTML = `Nog geen posts. <a href="compose.html">Maak je eerste post</a> ✨`;
+        list.appendChild(emp);
+        return;
       }
-      return tok;
-    }).join('');
+      for (const p of posts){
+        const node = tpl.content.cloneNode(true);
 
-    // 2) grammar-ish fixes
-    t = t.replace(/\b(het|dit|dat|wat|alles|niets|iets|er)\s+word\b/gi, (_,p1)=> `${p1} wordt`);
-    t = t.replace(/\bmis+ch?ie?n\b/gi, 'misschien');
-    t = t.replace(/\bi\b/g, 'I');
+        node.querySelector('.avatar').src =
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(p.user||'U')}&background=6a0dad&color=fff`;
+        node.querySelector('.username').textContent = p.user || 'user_demo';
+        node.querySelector('.time').textContent = timeLabel(p.createdAt);
 
-    // 3) punctuation & casing
-    t = fixSpacing(t);
-    if (!/[.!?…]$/.test(t)) t += '.';
-    t = sentenceCase(t);
-    t = fixSpacing(t).trim();
-    return t;
-  }
-  function makeHook(text){
-    const first = (text.split(/[.!?]/)[0] || text).trim();
-    return first.slice(0, 80);
-  }
-  function makeHashtags(text){
-    const words = [...new Set(
-      text.toLowerCase()
-        .replace(/[^a-zà-ÿ0-9\s-]/gi,'')
-        .split(/\s+/)
-        .filter(w=>w.length>=6 && !['misschien','inderdaad','iedere','omdat','vandaag','morgen'].includes(w))
-    )];
-    words.sort((a,b)=>b.length-a.length);
-    return words.slice(0,5).map(w=>`#${w.replace(/-+/g,'')}`);
-  }
+        const img = node.querySelector('.image');
+        if (p.img) { img.src = p.img; img.alt = p.alt || 'Post afbeelding'; }
+        else { img.src = 'https://placehold.co/1000x750/1f1f1f/aaaaaa?text=Geen+afbeelding'; img.alt = 'Placeholder'; }
 
-  // ================= FEED / UI =================
-  const form = document.getElementById('composerForm');
-  const tpl = document.getElementById('postTpl');
-  const feed = document.getElementById('feed');
-  const progress = document.getElementById('progress');
-  const posts = [];
-  let index = 0, timer = null;
-  const FEED_INTERVAL = 5000;
-
-  function animateProgress() {
-    if (!progress) return;
-    progress.style.transition = 'none';
-    progress.style.width = '0%';
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        progress.style.transition = `width ${FEED_INTERVAL}ms linear`;
-        progress.style.width = '100%';
-      });
-    });
-  }
-  function renderPost(p) {
-    if (!tpl) return showMsg('Template niet gevonden.');
-    feed.innerHTML = '';
-    const node = tpl.content.cloneNode(true);
-
-    node.querySelector('.avatar').src =
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(p.user||'U')}&background=6a0dad&color=fff`;
-    node.querySelector('.username').textContent = p.user || 'user_demo';
-
-    const imgEl = node.querySelector('.image');
-    if (p.img) { imgEl.src = p.img; imgEl.alt = p.alt; }
-    else { imgEl.src = 'https://placehold.co/800x800/1f1f1f/aaaaaa?text=Geen+afbeelding'; imgEl.alt = 'Placeholder'; }
-
-    const textEl = node.querySelector('.text');
-    const tagEl  = node.querySelector('.hashtags');
-    textEl.textContent = `【Hook】 ${p.hook}\n\n${p.caption}`;
-    tagEl.textContent  = (p.hashtags || []).join(' ');
-
-    node.querySelector('.toggle-original').addEventListener('change', (e) => {
-      if (e.target.checked) {
-        textEl.textContent = p.original || '—';
-        tagEl.textContent  = '';
-        feed.querySelector('.badge').textContent = 'Original';
-        feed.querySelector('.pill.ai').textContent = 'Original View';
-      } else {
+        const textEl = node.querySelector('.text');
+        const tagEl  = node.querySelector('.hashtags');
         textEl.textContent = `【Hook】 ${p.hook}\n\n${p.caption}`;
         tagEl.textContent  = (p.hashtags || []).join(' ');
-        feed.querySelector('.badge').textContent = 'Corrected';
-        feed.querySelector('.pill.ai').textContent = 'AutoCorrect';
-      }
-    });
 
-    feed.appendChild(node);
-    animateProgress();
-  }
-  function nextPost() {
-    if (!posts.length) return;
-    renderPost(posts[index % posts.length]);
-    index++;
-  }
-  function startLoop() {
-    if (timer) clearInterval(timer);
-    nextPost();
-    timer = setInterval(nextPost, FEED_INTERVAL);
-  }
-
-  // Guard: form exists?
-  if (!form) showMsg('Formulier niet gevonden. Klopt je HTML?');
-
-  // Submit handler
-  form?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    try {
-      const fd = new FormData(form);
-      const rawText  = (fd.get('text') ?? '').toString();
-      const user     = (fd.get('username') ?? 'user_demo').toString() || 'user_demo';
-      const imgdesc  = (fd.get('imgdesc') ?? '').toString();
-      const file     = fd.get('image');
-
-      let dataUrl = null;
-      if (file && file.size) {
-        dataUrl = await new Promise((resolve) => {
-          const r = new FileReader();
-          r.onload = () => resolve(r.result);
-          r.readAsDataURL(file);
+        node.querySelector('.toggle-original').addEventListener('change', (e)=>{
+          if (e.target.checked){
+            textEl.textContent = p.original || '—';
+            tagEl.textContent = '';
+            list.querySelector('.badge')?.classList.add('neutral');
+            list.querySelector('.badge')?.classList.remove('ok');
+          } else {
+            textEl.textContent = `【Hook】 ${p.hook}\n\n${p.caption}`;
+            tagEl.textContent  = (p.hashtags || []).join(' ');
+          }
         });
+
+        list.appendChild(node);
       }
-
-      const corrected = autocorrect(rawText);
-      const hook = makeHook(corrected);
-      const hashtags = makeHashtags(corrected);
-
-      console.log('%cOriginal:', 'color:#aaa', rawText);
-      console.log('%cCorrected:', 'color:#7dfc9f', corrected);
-
-      posts.push({
-        user,
-        original: rawText,
-        hook,
-        caption: corrected,
-        hashtags,
-        alt: imgdesc ? imgdesc.slice(0,120) : 'Autocorrected post',
-        img: dataUrl
-      });
-
-      form.reset();
-      document.querySelector('.empty')?.remove();
-      if (posts.length === 1) startLoop();
-    } catch(err){
-      console.error(err);
-      showMsg('Er ging iets mis bij het posten. Check de console voor details.');
     }
-  });
+
+    render(); // on load
   </script>
 </body>
 </html>

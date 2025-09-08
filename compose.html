@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>AI Feed – Nieuwe post</title>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+  <header class="appbar">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 1 7 7v6.5l1.6 2.77a1 1 0 0 1-1.74 1L18 17.5V9a6 6 0 1 0-12 0v8.5l-0.86 1.5a1 1 0 0 1-1.74-1L5 15.5V9a7 7 0 0 1 7-7Z"/></svg>
+      <span>AI Feed</span>
+    </div>
+    <nav class="topnav">
+      <a class="btn ghost" href="index.html">← Terug naar feed</a>
+    </nav>
+  </header>
+
+  <main class="page two-col">
+    <section class="composer card">
+      <h2>Nieuwe post</h2>
+      <form id="composerForm">
+        <div class="row">
+          <img class="avatar" src="https://ui-avatars.com/api/?name=U&background=6a0dad&color=fff" alt="Avatar"/>
+          <input type="text" name="username" placeholder="Gebruikersnaam (optioneel)"/>
+        </div>
+
+        <textarea name="text" rows="5" placeholder="Schrijf iets… met spelfouten of rare zinnen, ik fix het 😉" spellcheck="true" required></textarea>
+
+        <div class="upload-row">
+          <input type="file" name="image" id="image" accept="image/*"/>
+          <label for="image" class="btn ghost">Afbeelding kiezen</label>
+          <input type="text" name="imgdesc" placeholder="Korte beschrijving (voor alt-tekst, optioneel)"/>
+        </div>
+
+        <div class="row gap">
+          <button class="btn primary" type="submit">Opslaan in feed</button>
+          <button class="btn ghost" type="button" id="previewBtn">Voorbeeld</button>
+        </div>
+        <p class="hint">De post wordt lokaal opgeslagen en verschijnt in de feed.</p>
+      </form>
+    </section>
+
+    <section class="card preview" id="previewCard" hidden>
+      <h3>Voorbeeld (autocorrect)</h3>
+      <div class="cap">
+        <div class="pre-hook" id="prevHook"></div>
+        <div class="pre-body" id="prevBody"></div>
+        <div class="pre-tags" id="prevTags"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    © 2025 AI Feed — compose
+  </footer>
+
+  <script>
+    // ---------- Storage helpers ----------
+    const LS_KEY = 'aiFeedPostsV1';
+    const loadPosts = () => {
+      try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
+      catch { return []; }
+    };
+    const savePosts = (arr) => localStorage.setItem(LS_KEY, JSON.stringify(arr));
+    const addPost   = (p) => { const arr = loadPosts(); arr.push(p); savePosts(arr); };
+
+    // ---------- Autocorrect (same as before) ----------
+    const DICT = {
+      "ikben":"ik ben","kben":"ik ben","ikheb":"ik heb","kheb":"ik heb","ikkan":"ik kan","kkan":"ik kan",
+      "kvind":"ik vind","ikvindt":"ik vind","vindik":"vind ik","zegmaar":"zeg maar",
+      "mss":"misschien","msschien":"misschien","mischien":"misschien","mischein":"misschien","misschein":"misschien",
+      "zowiezo":"sowieso","soweiso":"sowieso","sowiezo":"sowieso",
+      "ff":"even","mr":"maar","idd":"inderdaad","iig":"in ieder geval","wss":"waarschijnlijk","wrm":"waarom",
+      "mn":"mijn","me":"mij","mezelf":"mijzelf","zkr":"zeker","tog":"toch",
+      "helo":"hello","wrld":"world","teh":"the","adress":"address","recieve":"receive","becouse":"because","wich":"which",
+      "dont":"don't","cant":"can't"
+    };
+    const fixSpacing = (s)=> s.replace(/\s+/g,' ').replace(/\s+([,.!?;:])/g,'$1').replace(/([,.!?;:])(?=\S)/g,'$1 ').replace(/\s+'\s+/g,"'").replace(/\s*-\s*/g,' - ');
+    const sentenceCase = (s)=> s.replace(/(^\s*[a-zà-ÿ])|([.!?]\s+[a-zà-ÿ])/g, x=>x.toUpperCase());
+    function autocorrect(text){
+      if (!text) return "";
+      let t = String(text).replace(/[’]/g,"'").trim();
+      t = t.split(/(\b)/).map(tok=>{
+        const low = tok.toLowerCase();
+        if (DICT[low]){
+          const rep = DICT[low];
+          return /^[A-ZÀ-Ý]/.test(tok) ? rep.charAt(0).toUpperCase()+rep.slice(1) : rep;
+        }
+        return tok;
+      }).join('');
+      t = t.replace(/\b(het|dit|dat|wat|alles|niets|iets|er)\s+word\b/gi, (_,p1)=> `${p1} wordt`);
+      t = t.replace(/\bmis+ch?ie?n\b/gi, 'misschien');
+      t = t.replace(/\bi\b/g, 'I');
+      t = fixSpacing(t);
+      if (!/[.!?…]$/.test(t)) t += '.';
+      t = sentenceCase(t);
+      return fixSpacing(t).trim();
+    }
+    const makeHook = (txt)=> (txt.split(/[.!?]/)[0]||txt).trim().slice(0,80);
+    function makeHashtags(text){
+      const words = [...new Set(text.toLowerCase().replace(/[^a-zà-ÿ0-9\s-]/gi,'').split(/\s+/).filter(w=>w.length>=6 && !['misschien','inderdaad','iedere','omdat','vandaag','morgen'].includes(w)))];
+      words.sort((a,b)=>b.length-a.length);
+      return words.slice(0,5).map(w=>`#${w.replace(/-+/g,'')}`);
+    }
+
+    // ---------- Compose logic ----------
+    const form = document.getElementById('composerForm');
+    const prevCard = document.getElementById('previewCard');
+    const prevHook = document.getElementById('prevHook');
+    const prevBody = document.getElementById('prevBody');
+    const prevTags = document.getElementById('prevTags');
+
+    async function fileToDataUrl(file){
+      return new Promise((resolve)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.readAsDataURL(file); });
+    }
+
+    document.getElementById('previewBtn').addEventListener('click', (e)=>{
+      e.preventDefault();
+      const fd = new FormData(form);
+      const raw = (fd.get('text')??'').toString();
+      const corrected = autocorrect(raw);
+      const hook = makeHook(corrected);
+      const tags = makeHashtags(corrected);
+
+      prevHook.textContent = `【Hook】 ${hook}`;
+      prevBody.textContent = corrected;
+      prevTags.textContent = tags.join(' ');
+      prevCard.hidden = false;
+    });
+
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(form);
+      const user    = (fd.get('username')??'user_demo').toString() || 'user_demo';
+      const rawText = (fd.get('text')??'').toString();
+      const imgdesc = (fd.get('imgdesc')??'').toString();
+      const file    = fd.get('image');
+
+      let imgDataUrl = null;
+      if (file && file.size){
+        imgDataUrl = await fileToDataUrl(file);
+      }
+
+      const caption  = autocorrect(rawText);
+      const hook     = makeHook(caption);
+      const hashtags = makeHashtags(caption);
+
+      const post = {
+        id: crypto.randomUUID(),
+        user,
+        original: rawText,
+        caption,
+        hook,
+        hashtags,
+        alt: imgdesc ? imgdesc.slice(0,120) : 'Autocorrected post',
+        img: imgDataUrl,
+        createdAt: Date.now()
+      };
+
+      addPost(post);
+      // Redirect to feed
+      window.location.href = 'index.html';
+    });
+  </script>
+</body>
+</html>
