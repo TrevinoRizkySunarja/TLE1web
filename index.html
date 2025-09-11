@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>AlterNet</title>
+  <title>AlterNet — Feed</title>
   <link rel="stylesheet" href="css/style.css"/>
 </head>
 <body>
@@ -77,24 +77,13 @@
   </template>
 
   <script>
-    // ---------- Storage helpers ----------
     const LS_KEY = 'aiFeedPostsV1';
-    const loadPosts = () => {
-      try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
-      catch { return []; }
-    };
-    const savePosts = (arr) => localStorage.setItem(LS_KEY, JSON.stringify(arr));
+    const loadPosts = () => { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; } };
 
-    // ---------- Render feed ----------
     const list = document.getElementById('feedList');
     const tpl  = document.getElementById('postCardTpl');
 
-    function timeLabel(ts){
-      try {
-        const d = new Date(ts);
-        return d.toLocaleString();
-      } catch { return 'nu'; }
-    }
+    const timeLabel = ts => { try { return new Date(ts).toLocaleString(); } catch { return 'nu'; } };
 
     function render(){
       const posts = loadPosts().sort((a,b)=>b.createdAt - a.createdAt);
@@ -127,8 +116,6 @@
           if (e.target.checked){
             textEl.textContent = p.original || '—';
             tagEl.textContent = '';
-            list.querySelector('.badge')?.classList.add('neutral');
-            list.querySelector('.badge')?.classList.remove('ok');
           } else {
             textEl.textContent = `【Hook】 ${p.hook}\n\n${p.caption}`;
             tagEl.textContent  = (p.hashtags || []).join(' ');
@@ -139,7 +126,7 @@
       }
     }
 
-    render(); // on load
+    render();
   </script>
 </body>
 </html>

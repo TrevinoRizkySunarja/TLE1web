@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>AI Feed – Nieuwe post</title>
+  <title>AlterNet — Nieuwe post</title>
   <link rel="stylesheet" href="css/style.css"/>
 </head>
 <body>
   <header class="appbar">
     <div class="brand">
       <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 1 7 7v6.5l1.6 2.77a1 1 0 0 1-1.74 1L18 17.5V9a6 6 0 1 0-12 0v8.5l-0.86 1.5a1 1 0 0 1-1.74-1L5 15.5V9a7 7 0 0 1 7-7Z"/></svg>
-      <span>AI Feed</span>
+      <span>AlterNet</span>
     </div>
     <nav class="topnav">
       <a class="btn ghost" href="index.html">← Terug naar feed</a>
@@ -36,6 +36,7 @@
 
         <div class="row gap">
           <button class="btn primary" type="submit">Opslaan in feed</button>
+          <button class="btn ghost" type="button" id="previewBtn">Voorbeeld</button>
         </div>
         <p class="hint">De post wordt lokaal opgeslagen en verschijnt in de feed.</p>
       </form>
@@ -52,20 +53,17 @@
   </main>
 
   <footer class="foot">
-    © 2025 AI Feed — compose
+    © 2025 AlterNet — compose
   </footer>
 
   <script>
-    // ---------- Storage helpers ----------
+    // ---------- Storage ----------
     const LS_KEY = 'aiFeedPostsV1';
-    const loadPosts = () => {
-      try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
-      catch { return []; }
-    };
+    const loadPosts = () => { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; } };
     const savePosts = (arr) => localStorage.setItem(LS_KEY, JSON.stringify(arr));
     const addPost   = (p) => { const arr = loadPosts(); arr.push(p); savePosts(arr); };
 
-    // ---------- Autocorrect (same as before) ----------
+    // ---------- Autocorrect ----------
     const DICT = {
       "ikben":"ik ben","kben":"ik ben","ikheb":"ik heb","kheb":"ik heb","ikkan":"ik kan","kkan":"ik kan",
       "kvind":"ik vind","ikvindt":"ik vind","vindik":"vind ik","zegmaar":"zeg maar",
@@ -104,8 +102,9 @@
       return words.slice(0,5).map(w=>`#${w.replace(/-+/g,'')}`);
     }
 
-    // ---------- Compose logic ----------
+    // ---------- Compose ----------
     const form = document.getElementById('composerForm');
+    const previewBtn = document.getElementById('previewBtn');
     const prevCard = document.getElementById('previewCard');
     const prevHook = document.getElementById('prevHook');
     const prevBody = document.getElementById('prevBody');
@@ -115,19 +114,21 @@
       return new Promise((resolve)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.readAsDataURL(file); });
     }
 
-    document.getElementById('previewBtn').addEventListener('click', (e)=>{
-      e.preventDefault();
-      const fd = new FormData(form);
-      const raw = (fd.get('text')??'').toString();
-      const corrected = autocorrect(raw);
-      const hook = makeHook(corrected);
-      const tags = makeHashtags(corrected);
-
-      prevHook.textContent = `【Hook】 ${hook}`;
-      prevBody.textContent = corrected;
-      prevTags.textContent = tags.join(' ');
-      prevCard.hidden = false;
-    });
+    // Preview (met guard, zodat het nooit crasht)
+    if (previewBtn){
+      previewBtn.addEventListener('click', (e)=>{
+        e.preventDefault();
+        const fd = new FormData(form);
+        const raw = (fd.get('text')??'').toString();
+        const corrected = autocorrect(raw);
+        const hook = makeHook(corrected);
+        const tags = makeHashtags(corrected);
+        prevHook.textContent = `【Hook】 ${hook}`;
+        prevBody.textContent = corrected;
+        prevTags.textContent = tags.join(' ');
+        prevCard.hidden = false;
+      });
+    }
 
     form.addEventListener('submit', async (e)=>{
       e.preventDefault();
@@ -147,7 +148,7 @@
       const hashtags = makeHashtags(caption);
 
       const post = {
-        id: crypto.randomUUID(),
+        id: (crypto?.randomUUID && crypto.randomUUID()) || String(Date.now()),
         user,
         original: rawText,
         caption,
@@ -159,7 +160,6 @@
       };
 
       addPost(post);
-      // Redirect to feed
       window.location.href = 'index.html';
     });
   </script>
